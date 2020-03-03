@@ -78,22 +78,25 @@ class Engine:
     factor = math.sqrt(reduce(lambda x,y: x + y *y, values))
     query_count = {token: count / factor for token,count in query_count.items()}
     postings_list = self.get_top_10_postings(query_count)
+    self.cosine_similarity(postings_list, query_count)
+  def cosine_similarity(self, postings_list, query):
     sets = []
+    occurences = Counter()
+    weights = {}
+    total_non_zero_terms = len([x for x in postings_list.values() if x != []])
+    print(total)
     for posting in postings_list:
       sets.append(set(postings_list[posting]))
-    self.cosine_similarity(sets, postings_list, query_count, all_files)
-  def cosine_similarity(self, sets, postings_list, query, all_files):
-    weights = {}
+      for file_ in postings_list[posting]:
+        occurences[file_] += 1
     common = set.intersection(*sets)
-
-    #for document in common:
-    #  document_vector = dict((k, self.tfidf_document[k])
-    #      for k in query.keys() if k in self.tfidf_document)
-    #  dot_product = sum(document_vector[key] * postings_list[key] for key in document_vector)
+    all_files = set.union(*sets)
+    for file_ in occurences:
+      for token in query.keys():
 
 
   def get_top_10_postings(self, query_count):
-    postings_list = { k: [] for k in quert_count.keys() }
+    postings_list = { k: [] for k in query_count.keys() }
     limit = 9
     old_value = float('-inf')
     for token in query_count.keys():
