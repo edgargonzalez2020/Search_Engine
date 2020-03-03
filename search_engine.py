@@ -1,11 +1,13 @@
+
 import math
 import os
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import RegexpTokenizer
 from collections import Counter
+from collections import OrderedDict
 from functools import reduce
-
+from operator import itemgetter
 class Engine:
   def __init__(self, path_to_file):
     self.path = path_to_file
@@ -48,26 +50,62 @@ class Engine:
       for _, count in self.tfidf_document[filename].items():
         total += (count ** 2)
       total = math.sqrt(total)
-      self.tfidf_document[filename] = {token: count / total for token, count in self.tfidf_document[filename].items()}
-  def get_idf(self, token):
+      self.tfidf_document[filename] = { token: count / total
+          for token, count in self.tfidf_document[filename].items()}
+      self.tfidf_document[filename] = { k: v
+          for k,v in sorted(self.tfidf_document[filename].items(), key = lambda x: x[1], reverse=True) }
     try:
       _, count = self.words[token]
       return math.log(self.file_count / count , 10)
+    except KeyError:
+      return -1
+  def get_idf(self, token):
+    try:
+      _,count = self.words[token]
+      return math.log(self.file_count / count, 10)
     except KeyError:
       return -1
   def get_weight(self, filename, token):
     if token not in self.token_count[filename]:
       return 0
     return self.tfidf_document[filename][token]
-  def get_query(qstring):
+  def get_query(self, qstring):
     tokenized_query = self.tokenizer.tokenize(qstring)
-    token_count = { k: 1 + math.log(v, 10) for k,v in token_count.items() }
-    values = token_count.values()
+    query_count = Counter(tokenized_query)
+    query_count = { k: 1 + math.log(v) for k,v in query_count.items() }
+    values = list(query_count.values())
     values[0] = values[0] ** 2
-    factor = math.sqrt(reduce(lambda x,y: x + y * y,values))
-    token_count = { k: v / factor for k,v in token_count.items() }
-  def get_posting(self):
-    pass
+    factor = math.sqrt(reduce(lambda x,y: x + y *y, values))
+    query_count = {token: count / factor for token,count in query_count.items()}
+    postings_list = self.get_top_10_postings(query_count)
+    sets = []
+    for posting in postings_list:
+      sets.append(set(postings_list[posting]))
+    self.cosine_similarity(sets, postings_list, query_count, all_files)
+  def cosine_similarity(self, sets, postings_list, query, all_files):
+    weights = {}
+    common = set.intersection(*sets)
+
+    #for document in common:
+    #  document_vector = dict((k, self.tfidf_document[k])
+    #      for k in query.keys() if k in self.tfidf_document)
+    #  dot_product = sum(document_vector[key] * postings_list[key] for key in document_vector)
+
+
+  def get_top_10_postings(self, query_count):
+    postings_list = { k: [] for k in quert_count.keys() }
+    limit = 9
+    old_value = float('-inf')
+    for token in query_count.keys():
+      for filename in self.files:
+        if token not in self.tfidf_document[filename]:
+          continue
+        value = self.tfidf_document[filename][token]
+        if value >= old_value and limit >= 0:
+          postings_list[token].append(filename)
+        limit -= 1
+      limit = 9
+    return postings_list
 def tfidf(token, count):
   return (1 + math.log(count , 10)) * engine.get_idf(token)
 
@@ -75,7 +113,7 @@ def main():
   root = './presidential_debates'
   global engine
   engine = Engine(root)
-  print("%.12f" % getweight("1976-10-22.txt","agenda"))
+  print("(%s, %.12f)" % query("health insurance wall street"))
 def getidf(token):
   return engine.get_idf(token)
 
