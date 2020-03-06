@@ -1,4 +1,4 @@
-
+import copy
 import math
 import os
 from nltk.corpus import stopwords
@@ -88,7 +88,6 @@ class Engine:
     last = { k: v[-1] for k,v in postings_list.items() if v != [] }
     occurences = Counter()
     weights = {k: 0 for k in all_files}
-    max_so_far = float('-inf')
     for posting in postings_list:
       sets.append(set(postings_list[posting]))
       for file_ in postings_list[posting]:
@@ -97,22 +96,18 @@ class Engine:
       for token in query.keys():
         if files in postings_list[token] and counts[files] > 0:
           dot_product = query[token] * self.tfidf_document[files][token]
-          if dot_product > max_so_far:
-            max_so_far = dot_product
           weights[files] += dot_product
           counts[files] -= 1
           postings_list[token].remove(files)
         else:
           if postings_list[token] != [] and counts[files] > 0:
             dot_product = query[token] * self.tfidf_document[last[token]][token]
-            if dot_product > max_so_far:
-              max_so_far = dot_product
             weights[files] += dot_product
             counts[files] -= 1
-    #if the max value isnt a document that appears in every token we need to fetch more
     maximum = max(weights, key=weights.get)
-    print(max_so_far)
-    return (maximum, weights[maximum]) if weights[maximum] >= max_so_far else ("fetch more", 0)
+    if occurences[maximum] != len(query.keys()):
+      return "fetch more", 0
+    return (maximum, weights[maximum]) if occurences[maximum] == len(query.keys()) else ("fetch more", 0)
 
   def get_top_10_postings(self, query_count):
     postings_list = { k: [] for k in query_count.keys() }
