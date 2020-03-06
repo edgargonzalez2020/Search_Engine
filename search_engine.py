@@ -71,44 +71,58 @@ class Engine:
     return self.tfidf_document[filename][token]
   def get_query(self, qstring):
     tokenized_query = self.tokenizer.tokenize(qstring)
+    tokenized_query = list(map(lambda x: self.stemmer.stem(x), tokenized_query))
     query_count = Counter(tokenized_query)
     query_count = { k: 1 + math.log(v) for k,v in query_count.items() }
     values = list(query_count.values())
     values[0] = values[0] ** 2
     factor = math.sqrt(reduce(lambda x,y: x + y *y, values))
     query_count = {token: count / factor for token,count in query_count.items()}
-    postings_list = self.get_top_10_postings(query_count)
-    self.cosine_similarity(postings_list, query_count)
-  def cosine_similarity(self, postings_list, query):
+    postings_list, all_files = self.get_top_10_postings(query_count)
+    return self.cosine_similarity(postings_list, query_count, all_files)
+  def cosine_similarity(self, postings_list, query, all_files):
+    if len([x for x in postings_list.values() if x == [] ]) == len(postings_list.keys()):
+      return None, 0
     sets = []
+    counts = {files:len([x for x in postings_list.values() if x != []]) for files in all_files}
+    last = { k: v[-1] for k,v in postings_list.items() if v != [] }
     occurences = Counter()
-    weights = {}
-    total_non_zero_terms = len([x for x in postings_list.values() if x != []])
-    print(total)
+    weights = {k: 0 for k in all_files}
+    max_so_far = float('-inf')
     for posting in postings_list:
       sets.append(set(postings_list[posting]))
       for file_ in postings_list[posting]:
         occurences[file_] += 1
-    common = set.intersection(*sets)
-    all_files = set.union(*sets)
-    for file_ in occurences:
+    for files in all_files:
       for token in query.keys():
-
+        if files in postings_list[token] and counts[files] > 0:
+          dot_product = query[token] * self.tfidf_document[files][token]
+          if dot_product > max_so_far:
+            max_so_far = dot_product
+          weights[files] += dot_product
+          counts[files] -= 1
+          postings_list[token].remove(files)
+        else:
+          if postings_list[token] != [] and counts[files] > 0:
+            dot_product = query[token] * self.tfidf_document[last[token]][token]
+            if dot_product > max_so_far:
+              max_so_far = dot_product
+            weights[files] += dot_product
+            counts[files] -= 1
+    #if the max value isnt a document that appears in every token we need to fetch more
+    maximum = max(weights, key=weights.get)
+    print(max_so_far)
+    return (maximum, weights[maximum]) if weights[maximum] >= max_so_far else ("fetch more", 0)
 
   def get_top_10_postings(self, query_count):
     postings_list = { k: [] for k in query_count.keys() }
-    limit = 9
-    old_value = float('-inf')
+    all_files = []
     for token in query_count.keys():
-      for filename in self.files:
-        if token not in self.tfidf_document[filename]:
-          continue
-        value = self.tfidf_document[filename][token]
-        if value >= old_value and limit >= 0:
-          postings_list[token].append(filename)
-        limit -= 1
-      limit = 9
-    return postings_list
+      top_10 = sorted([(files, self.tfidf_document[files])
+        for files in self.files if token in self.tfidf_document[files]], key=lambda kv: kv[1][token], reverse=True)
+      postings_list[token] = [x[0] for x in top_10[:10]]
+      all_files.extend([x[0] for x in top_10])
+    return postings_list, all_files
 def tfidf(token, count):
   return (1 + math.log(count , 10)) * engine.get_idf(token)
 
@@ -116,7 +130,10 @@ def main():
   root = './presidential_debates'
   global engine
   engine = Engine(root)
+  print("(%s, %.12f)" % query("vector entropy"))
+  print("(%s, %.12f)" % query("terror attack"))
   print("(%s, %.12f)" % query("health insurance wall street"))
+  print("(%s, %.12f)" % query("particular constitutional amendment"))
 def getidf(token):
   return engine.get_idf(token)
 
