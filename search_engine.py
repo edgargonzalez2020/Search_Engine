@@ -1,4 +1,4 @@
-import copy
+import time
 import math
 import os
 from nltk.corpus import stopwords
@@ -18,7 +18,6 @@ class Engine:
     self.exclude = set(stopwords.words('english'))
     self.stemmer = PorterStemmer()
     self.prepare_words()
-
   def prepare_words(self):
     self.file_count = 0
     for filename in os.listdir(self.path):
@@ -41,6 +40,7 @@ class Engine:
         if not counted[word]:
           self.words[word] = (self.token_count[filename][word], self.words[word][1] + 1)
           counted[word] = True
+    print(self.words['septemb'])
     for filename in self.files:
       for token in self.token_count[filename].keys():
         if filename not in self.tfidf_document:
@@ -108,7 +108,6 @@ class Engine:
     if occurences[maximum] != len(query.keys()):
       return "fetch more", 0
     return (maximum, weights[maximum]) if occurences[maximum] == len(query.keys()) else ("fetch more", 0)
-
   def get_top_10_postings(self, query_count):
     postings_list = { k: [] for k in query_count.keys() }
     all_files = []
@@ -125,10 +124,13 @@ def main():
   root = './presidential_debates'
   global engine
   engine = Engine(root)
+  start = time.time()
   print("(%s, %.12f)" % query("vector entropy"))
   print("(%s, %.12f)" % query("terror attack"))
   print("(%s, %.12f)" % query("health insurance wall street"))
   print("(%s, %.12f)" % query("particular constitutional amendment"))
+  end = time.time()
+  print("Elapsed time: " , (end - start) * 100)
 def getidf(token):
   return engine.get_idf(token)
 
@@ -139,5 +141,3 @@ def query(qstring):
   return engine.get_query(qstring.lower())
 if __name__ == '__main__':
   main()
-
-
